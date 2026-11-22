@@ -3,350 +3,712 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>ポモドーロタイマー</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>テレプロンプター</title>
   <style>
     :root {
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
-      color: #172433;
-      background: #eaf3f1;
-      font-synthesis: none;
+      color-scheme: dark;
+      font-family: system-ui, "Yu Gothic UI", Meiryo, sans-serif;
+      color: #f5f6f7;
+      background: #0c0e10;
+      --panel: #141719;
+      --surface: #0b0d0e;
+      --border: #2b3033;
+      --muted: #a1acb0;
+      --accent: #aff2ce;
     }
+
     * { box-sizing: border-box; }
-    body {
-      --accent: #15776d;
-      --surface: #eaf3f1;
-      margin: 0;
-      min-height: 100vh;
-      background: var(--surface);
-      transition: background-color .35s ease;
+    body { margin: 0; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: default; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    .app {
+      width: min(100% - 64px, 1440px);
+      margin-inline: auto;
+      padding-block: 25px 36px;
     }
-    body.break {
-      --accent: #a35b2b;
-      --surface: #fff1e5;
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
     }
-    main {
-      width: min(100% - 32px, 520px);
-      margin: 0 auto;
-      padding: clamp(24px, 6vh, 56px) 0 40px;
-    }
-    h1 { margin: 0 0 8px; font-size: clamp(1.45rem, 5vw, 1.9rem); text-align: center; }
-    .intro { margin: 0 0 26px; color: #56636b; text-align: center; font-size: .95rem; }
-    .card {
-      background: #fff;
-      border-radius: 28px;
-      box-shadow: 0 16px 48px rgba(23, 36, 51, .09);
-      padding: clamp(24px, 6vw, 38px);
-      text-align: center;
-    }
-    .phase {
-      display: inline-block;
-      border-radius: 999px;
-      padding: 8px 18px;
-      background: var(--surface);
-      color: var(--accent);
-      font-weight: 800;
-      letter-spacing: .08em;
-    }
-    .dial {
-      width: min(72vw, 290px);
-      aspect-ratio: 1;
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+
+    .brand-icon {
       display: grid;
       place-items: center;
-      margin: 26px auto 18px;
-      border-radius: 50%;
-      background: conic-gradient(var(--accent) var(--progress, 100%), #e8edf0 0);
-      transition: background .25s linear;
+      width: 38px;
+      aspect-ratio: 1;
+      border: 1px solid #3c5e50;
+      border-radius: 10px;
+      background: #192a24;
     }
-    .dial-inner {
-      width: calc(100% - 14px);
-      height: calc(100% - 14px);
+
+    .brand-icon::before {
+      content: "";
+      width: 18px;
+      height: 14px;
+      border-block: 2px solid var(--accent);
+      background: linear-gradient(var(--accent), var(--accent)) left center / 12px 2px no-repeat;
+    }
+
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 22px; letter-spacing: .035em; }
+    h2 { font-size: 15px; letter-spacing: .035em; }
+
+    .storage-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .storage-status::before {
+      content: "";
+      width: 7px;
+      aspect-ratio: 1;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+    }
+
+    .storage-status[data-error] { color: #ffc4a8; }
+    .storage-status[data-error]::before { border-color: currentColor; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(255px, 320px) minmax(0, 1fr);
+      gap: 20px;
+      margin-top: 23px;
+    }
+
+    .panel {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: var(--panel);
+    }
+
+    .editor {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: #fff;
+      padding: 19px;
     }
-    .time {
-      color: var(--accent);
-      font-size: clamp(3.8rem, 15vw, 5.4rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -.055em;
+
+    .editor-header, .control-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .character-count {
+      color: var(--muted);
+      font-size: 12px;
       font-variant-numeric: tabular-nums;
     }
-    .time-label { margin-top: 7px; color: #65737c; font-size: .9rem; }
-    .notice {
-      min-height: 3em;
-      margin: 0 0 18px;
-      line-height: 1.5;
-      font-weight: 600;
-    }
-    .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    button {
-      min-height: 52px;
-      border: 2px solid var(--accent);
-      border-radius: 14px;
-      background: #fff;
-      color: var(--accent);
-      font: inherit;
-      font-weight: 800;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    button.primary { color: #fff; background: var(--accent); }
-    button:hover:not(:disabled) { filter: brightness(.94); }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    button:focus-visible, input:focus-visible { outline: 3px solid #298bd0; outline-offset: 3px; }
-    .settings { margin-top: 20px; padding: 22px; border-radius: 22px; background: rgba(255,255,255,.8); }
-    h2 { margin: 0 0 17px; font-size: 1.06rem; }
-    .minutes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .field label { display: block; margin-bottom: 7px; font-weight: 700; }
-    .field input {
+
+    .script-input {
+      flex: 1;
       width: 100%;
-      height: 48px;
-      padding: 0 12px;
-      border: 1px solid #aebbc0;
-      border-radius: 10px;
-      background: #fff;
-      color: #172433;
+      min-height: 240px;
+      margin-top: 13px;
+      padding: 13px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: inherit;
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .script-input::placeholder { color: var(--muted); opacity: 1; }
+
+    .settings {
+      display: grid;
+      gap: 12px;
+      margin-top: 19px;
+      padding-top: 17px;
+      border-top: 1px solid var(--border);
+    }
+
+    .control-heading { font-size: 13px; }
+
+    .control-value {
+      color: var(--accent);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .range {
+      display: block;
+      width: 100%;
+      height: 28px;
+      margin: 4px 0 0;
+      appearance: none;
+      border-radius: 4px;
+      background: linear-gradient(to right, var(--accent) var(--range-fill), #363d40 var(--range-fill)) center / 100% 4px no-repeat;
+      cursor: pointer;
+    }
+
+    .range::-webkit-slider-thumb {
+      appearance: none;
+      width: 15px;
+      height: 15px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .range::-moz-range-thumb {
+      width: 15px;
+      height: 15px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .prompter { display: flex; flex-direction: column; overflow: hidden; }
+
+    .prompter-header, .prompter-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      padding: 12px 15px;
+    }
+
+    .prompter-heading, .display-controls, .playback-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .prompter-heading { gap: 12px; }
+
+    .playback-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .playback-status::before {
+      content: "";
+      width: 6px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .playback-status[data-state="running"] { color: var(--accent); }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 40px;
+      padding-inline: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #1c2022;
+      color: #f1f4f4;
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .display-controls .button { min-height: 35px; padding-inline: 9px; font-size: 12px; }
+    .button:hover:not(:disabled) { border-color: #687477; background: #282e30; }
+    .button:disabled { color: #90999d; background: #171a1c; }
+    .button.primary { border-color: transparent; background: var(--accent); color: #102019; }
+    .button.primary:hover:not(:disabled) { background: #cdfce1; }
+    .button.primary:disabled { border-color: #34473d; background: #25382f; color: #adc6b8; }
+
+    .play-icon {
+      width: 0;
+      height: 0;
+      border-block: 5px solid transparent;
+      border-left: 8px solid currentColor;
+    }
+
+    .pause-icon { width: 8px; height: 10px; border-inline: 2px solid currentColor; }
+    .fullscreen-icon { width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 2px; }
+
+    .switch-track {
+      display: flex;
+      align-items: center;
+      width: 26px;
+      height: 15px;
+      padding-inline: 2px;
+      border-radius: 99px;
+      background: #424c4f;
+    }
+
+    .switch-track::after {
+      content: "";
+      width: 11px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #d8dfdf;
+    }
+
+    [aria-checked="true"] .switch-track { justify-content: end; background: var(--accent); }
+    [aria-checked="true"] .switch-track::after { background: #14281e; }
+
+    .surface {
+      --guide-position: 48%;
+      position: relative;
+      flex: 1 0 auto;
+      min-height: clamp(330px, 54vh, 660px);
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+      background: linear-gradient(var(--accent), var(--accent)) center var(--guide-position) / calc(100% - 34px) 2px no-repeat #000;
+      outline-offset: -4px;
+    }
+
+    .surface::before, .surface::after {
+      position: absolute;
+      top: var(--guide-position);
+      transform: translateY(-50%);
+      content: "";
+      border-block: 6px solid transparent;
+      pointer-events: none;
+    }
+
+    .surface::before { left: 11px; border-left: 7px solid var(--accent); }
+    .surface::after { right: 11px; border-right: 7px solid var(--accent); }
+
+    .script {
+      position: absolute;
+      top: 0;
+      inset-inline: clamp(24px, 5%, 64px);
+    }
+
+    .script-text {
+      color: #fff;
+      font-size: var(--script-size, 48px);
+      font-weight: 650;
+      line-height: 1.5;
+      text-align: center;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-break: strict;
+    }
+
+    .is-mirrored .script-text { transform: scaleX(-1); }
+
+    .empty-state {
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 16px;
+      min-height: 100%;
+      position: absolute;
+      inset: 0;
+      padding: 28px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    [hidden] { display: none; }
+
+    .empty-icon {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 43px;
+      border: 1px solid #3a4545;
+      border-radius: 9px;
+      background: #0c1111;
+    }
+
+    .empty-icon::before {
+      content: "";
+      width: 24px;
+      height: 13px;
+      border-block: 1px solid #8ba29a;
+      background: linear-gradient(#8ba29a, #8ba29a) left center / 16px 1px no-repeat;
+    }
+
+    .progress {
+      appearance: none;
+      display: block;
+      width: 100%;
+      height: 3px;
+      border: 0;
+      border-radius: 0;
+      background: var(--border);
+      color: var(--accent);
+    }
+
+    .progress::-webkit-progress-bar { background: var(--border); }
+    .progress::-webkit-progress-value { background: var(--accent); }
+    .progress::-moz-progress-bar { background: var(--accent); }
+
+    .keyboard-hint { color: var(--muted); font-size: 12px; }
+
+    kbd {
+      display: inline-block;
+      margin-inline-end: 5px;
+      padding: 2px 6px;
+      border: 1px solid #434b4f;
+      border-radius: 4px;
+      color: #e3e9ea;
       font: inherit;
-      font-size: 1.1rem;
     }
-    .setting-note { margin: 10px 0 18px; color: #56636b; font-size: .82rem; line-height: 1.5; }
-    .sound-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .switch-label { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; cursor: pointer; }
-    .switch-label input { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; }
-    .test-button { min-height: 42px; padding: 0 14px; font-size: .9rem; }
-    .count { margin: 20px 0 0; text-align: center; font-weight: 700; }
-    .count strong { color: var(--accent); font-size: 1.45rem; font-variant-numeric: tabular-nums; }
-    .flash .card { animation: glow .7s ease-out 2; }
-    @keyframes glow { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent); } }
-    @media (max-width: 380px) {
-      .card { padding: 20px 16px; }
-      .controls { gap: 6px; }
-      button { font-size: .92rem; }
+
+    .prompter:is(:fullscreen, .is-full-window) {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      border-radius: 0;
     }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+
+    .prompter.is-full-window { position: fixed; inset: 0; z-index: 2; }
+    .full-window-open { overflow: hidden; }
+    .prompter:is(:fullscreen, .is-full-window) .surface { flex: 1 1 auto; min-height: 0; }
+    .prompter .progress { flex-shrink: 0; }
+
+    @media (max-width: 840px) {
+      .app { width: calc(100% - 36px); padding-top: 18px; }
+      .workspace { grid-template-columns: minmax(0, 1fr); gap: 15px; margin-top: 17px; }
+      .editor { padding: 15px; }
+      .script-input { min-height: 150px; }
+      .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    }
+
+    @media (max-width: 460px) {
+      .app { width: calc(100% - 24px); }
+      .app-header { padding-bottom: 14px; }
+      h1 { font-size: 19px; }
+      .prompter-header, .prompter-footer { padding-inline: 10px; }
+      .playback-controls { gap: 5px; }
+      .playback-controls .button { padding-inline: 8px; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <h1>ポモドーロタイマー</h1>
-    <p class="intro">集中と休憩をくり返して、無理なく進めましょう。</p>
+  <main class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true"></span>
+        <h1>テレプロンプター</h1>
+      </div>
+      <p id="storage-status" class="storage-status" role="status">原稿はこのブラウザに保存</p>
+    </header>
 
-    <section class="card" aria-label="タイマー">
-      <div class="phase" id="phase">集中中</div>
-      <div class="dial" id="dial">
-        <div class="dial-inner">
-          <div class="time" id="time" role="timer" aria-label="残り時間 25分00秒">25:00</div>
-          <div class="time-label">残り時間</div>
+    <div class="workspace">
+      <section class="panel editor" aria-labelledby="editor-title">
+        <div class="editor-header">
+          <h2 id="editor-title"><label for="script-input">原稿</label></h2>
+          <span id="character-count" class="character-count">0 文字</span>
         </div>
-      </div>
-      <p class="notice" id="notice" role="status" aria-live="polite">「開始」を押すとタイマーが動きます。</p>
-      <div class="controls">
-        <button class="primary" id="start" type="button">開始</button>
-        <button id="pause" type="button" disabled>一時停止</button>
-        <button id="reset" type="button">リセット</button>
-      </div>
-    </section>
+        <textarea id="script-input" class="script-input" placeholder="ここに原稿を貼り付けてください。" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
 
-    <section class="settings" aria-labelledby="settings-title">
-      <h2 id="settings-title">時間と音の設定</h2>
-      <div class="minutes">
-        <div class="field">
-          <label for="focus-minutes">集中（分）</label>
-          <input id="focus-minutes" type="number" min="1" max="180" step="1" value="25" inputmode="numeric">
+        <div class="settings">
+          <div>
+            <div class="control-heading">
+              <label for="speed">スクロール速度</label>
+              <output id="speed-value" for="speed" class="control-value">45 px/秒</output>
+            </div>
+            <input id="speed" class="range" type="range" min="10" max="150" step="1" value="45">
+          </div>
+          <div>
+            <div class="control-heading">
+              <label for="font-size">文字の大きさ</label>
+              <output id="font-size-value" for="font-size" class="control-value">48 px</output>
+            </div>
+            <input id="font-size" class="range" type="range" min="20" max="112" step="1" value="48">
+          </div>
         </div>
-        <div class="field">
-          <label for="break-minutes">休憩（分）</label>
-          <input id="break-minutes" type="number" min="1" max="180" step="1" value="5" inputmode="numeric">
+      </section>
+
+      <section id="prompter" class="panel prompter" aria-labelledby="prompter-title">
+        <header class="prompter-header">
+          <div class="prompter-heading">
+            <h2 id="prompter-title">読み上げ画面</h2>
+            <p id="playback-status" class="playback-status" role="status" data-state="idle">待機中</p>
+          </div>
+          <div class="display-controls">
+            <button id="mirror-button" class="button" type="button" role="switch" aria-checked="false">
+              ミラー <span class="switch-track" aria-hidden="true"></span>
+            </button>
+            <button id="fullscreen-button" class="button" type="button">
+              <span class="fullscreen-icon" aria-hidden="true"></span><span id="fullscreen-label">全画面</span>
+            </button>
+          </div>
+        </header>
+
+        <div id="reading-surface" class="surface" role="region" aria-label="原稿の表示" tabindex="-1">
+          <div id="empty-state" class="empty-state">
+            <span class="empty-icon" aria-hidden="true"></span>
+            <p>原稿を入力すると、ここに表示されます。</p>
+          </div>
+          <div id="script" class="script" hidden><div id="script-text" class="script-text"></div></div>
         </div>
-      </div>
-      <p class="setting-note">1〜180分で設定できます。進行中の時間には、次の切り替えから反映されます。</p>
-      <div class="sound-row">
-        <label class="switch-label" for="sound"><input id="sound" type="checkbox" role="switch" checked>音を鳴らす</label>
-        <button class="test-button" id="test-sound" type="button">テスト音</button>
-      </div>
-    </section>
-    <p class="count">完了した集中：<strong id="completed">0</strong> 回</p>
+
+        <progress id="progress" class="progress" max="100" value="0" aria-label="読み上げの進み具合"></progress>
+
+        <footer class="prompter-footer">
+          <div class="playback-controls">
+            <button id="start-button" class="button primary" type="button" disabled>
+              <span class="play-icon" aria-hidden="true"></span>スタート
+            </button>
+            <button id="pause-button" class="button" type="button" disabled>
+              <span class="pause-icon" aria-hidden="true"></span>一時停止
+            </button>
+            <button id="reset-button" class="button" type="button" disabled>先頭に戻す</button>
+          </div>
+          <p class="keyboard-hint"><kbd>Space</kbd> スタート・一時停止</p>
+        </footer>
+      </section>
+    </div>
   </main>
 
   <script>
-    (() => {
-      'use strict';
+    "use strict";
 
-      const $ = (id) => document.getElementById(id);
-      const ui = {
-        phase: $('phase'), time: $('time'), dial: $('dial'), notice: $('notice'),
-        start: $('start'), pause: $('pause'), reset: $('reset'),
-        focus: $('focus-minutes'), break: $('break-minutes'),
-        sound: $('sound'), testSound: $('test-sound'), completed: $('completed')
-      };
+    const storageKey = "teleprompter.script.v1";
+    const scriptInput = document.getElementById("script-input");
+    const characterCount = document.getElementById("character-count");
+    const storageStatus = document.getElementById("storage-status");
+    const prompter = document.getElementById("prompter");
+    const surface = document.getElementById("reading-surface");
+    const emptyState = document.getElementById("empty-state");
+    const script = document.getElementById("script");
+    const scriptText = document.getElementById("script-text");
+    const progress = document.getElementById("progress");
+    const playbackStatus = document.getElementById("playback-status");
+    const startButton = document.getElementById("start-button");
+    const pauseButton = document.getElementById("pause-button");
+    const resetButton = document.getElementById("reset-button");
+    const mirrorButton = document.getElementById("mirror-button");
+    const fullscreenButton = document.getElementById("fullscreen-button");
+    const fullscreenLabel = document.getElementById("fullscreen-label");
+    const speed = document.getElementById("speed");
+    const speedValue = document.getElementById("speed-value");
+    const fontSize = document.getElementById("font-size");
+    const fontSizeValue = document.getElementById("font-size-value");
 
-      let phase = 'focus';
-      let durationMs = 25 * 60_000;
-      let remainingMs = durationMs;
-      let endAt = 0;
-      let running = false;
-      let startedCurrent = false;
-      let completed = 0;
-      let audioContext = null;
-      let flashTimeout = null;
+    const statusLabels = {
+      idle: "待機中",
+      running: "再生中",
+      paused: "一時停止中",
+      ended: "最後まで表示しました"
+    };
 
-      function minutes(input) {
-        const value = Number(input.value);
-        const safe = Number.isFinite(value) ? Math.min(180, Math.max(1, Math.round(value))) : Number(input.defaultValue);
-        input.value = String(safe);
-        return safe;
+    let hasScript = false;
+    let state = "idle";
+    let distance = 0;
+    let startTop = 0;
+    let travel = 1;
+    let frameId = null;
+    let previousTime = null;
+    let pixelsPerSecond = speed.valueAsNumber;
+
+    function setStorageStatus(label, failed) {
+      if (storageStatus.textContent !== label) storageStatus.textContent = label;
+      storageStatus.toggleAttribute("data-error", failed);
+    }
+
+    function loadScript() {
+      try {
+        scriptInput.value = localStorage.getItem(storageKey) ?? "";
+      } catch {
+        setStorageStatus("このブラウザでは原稿を保存できません", true);
       }
+    }
 
-      function phaseDuration(nextPhase) {
-        return minutes(nextPhase === 'focus' ? ui.focus : ui.break) * 60_000;
+    function saveScript() {
+      try {
+        localStorage.setItem(storageKey, scriptInput.value);
+        setStorageStatus("原稿をこのブラウザに保存済み", false);
+      } catch {
+        setStorageStatus("原稿を保存できませんでした", true);
       }
+    }
 
-      function format(ms) {
-        const seconds = Math.ceil(Math.max(0, ms) / 1000);
-        return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    function setState(nextState) {
+      state = nextState;
+      playbackStatus.dataset.state = state;
+      if (playbackStatus.textContent !== statusLabels[state]) playbackStatus.textContent = statusLabels[state];
+      startButton.disabled = !hasScript || state === "running";
+      pauseButton.disabled = state !== "running";
+      resetButton.disabled = !hasScript;
+    }
+
+    function renderPosition() {
+      script.style.transform = `translateY(${startTop - distance}px)`;
+      const percent = Math.floor(distance / travel * 100);
+      if (progress.value !== percent) progress.value = percent;
+    }
+
+    function measure() {
+      const fraction = distance / travel;
+      startTop = surface.clientHeight * 0.66;
+      travel = Math.max(1, startTop + script.offsetHeight);
+      distance = fraction * travel;
+      renderPosition();
+    }
+
+    function stop(nextState) {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = null;
+      previousTime = null;
+      setState(nextState);
+    }
+
+    function reset() {
+      stop("idle");
+      distance = 0;
+      renderPosition();
+    }
+
+    function updateScript() {
+      const text = scriptInput.value;
+      hasScript = text.trim().length > 0;
+      scriptText.textContent = text;
+      script.hidden = !hasScript;
+      emptyState.hidden = hasScript;
+      characterCount.textContent = `${Array.from(text).length.toLocaleString("ja-JP")} 文字`;
+      reset();
+      measure();
+    }
+
+    function step(time) {
+      frameId = null;
+      if (previousTime !== null) {
+        const seconds = Math.min(time - previousTime, 50) / 1000;
+        distance = Math.min(travel, distance + pixelsPerSecond * seconds);
       }
+      previousTime = time;
+      renderPosition();
 
-      function render() {
-        const totalSeconds = Math.ceil(Math.max(0, remainingMs) / 1000);
-        const minutesLeft = Math.floor(totalSeconds / 60);
-        const secondsLeft = totalSeconds % 60;
-        ui.time.textContent = format(remainingMs);
-        ui.time.setAttribute('aria-label', `残り時間 ${minutesLeft}分${String(secondsLeft).padStart(2, '0')}秒`);
-        ui.phase.textContent = phase === 'focus' ? '集中中' : '休憩中';
-        ui.dial.style.setProperty('--progress', `${Math.min(100, Math.max(0, remainingMs / durationMs * 100))}%`);
-        document.body.classList.toggle('break', phase === 'break');
-        ui.start.disabled = running;
-        ui.pause.disabled = !running;
-        ui.testSound.disabled = !ui.sound.checked;
-        ui.completed.textContent = String(completed);
-        document.title = `${format(remainingMs)}｜${phase === 'focus' ? '集中' : '休憩'}｜ポモドーロタイマー`;
+      if (distance >= travel) {
+        stop("ended");
+        return;
       }
+      frameId = requestAnimationFrame(step);
+    }
 
-      function unlockAudio() {
-        if (!ui.sound.checked) return;
+    function start() {
+      if (!hasScript || state === "running") return;
+      if (state === "ended") reset();
+      setState("running");
+      frameId = requestAnimationFrame(step);
+    }
+
+    function updateRange(input, output, unit) {
+      const fill = (input.valueAsNumber - Number(input.min)) / (Number(input.max) - Number(input.min)) * 100;
+      input.style.setProperty("--range-fill", `${fill}%`);
+      output.value = `${input.value} ${unit}`;
+      input.setAttribute("aria-valuetext", output.value);
+    }
+
+    function updateSpeed() {
+      pixelsPerSecond = speed.valueAsNumber;
+      updateRange(speed, speedValue, "px/秒");
+    }
+
+    function updateFontSize() {
+      surface.style.setProperty("--script-size", `${fontSize.value}px`);
+      updateRange(fontSize, fontSizeValue, "px");
+      measure();
+    }
+
+    function updateFullscreenLabel() {
+      const expanded = document.fullscreenElement === prompter || prompter.classList.contains("is-full-window");
+      fullscreenLabel.textContent = expanded ? "全画面を終了" : "全画面";
+    }
+
+    function setFullWindow(expanded) {
+      prompter.classList.toggle("is-full-window", expanded);
+      document.documentElement.classList.toggle("full-window-open", expanded);
+      updateFullscreenLabel();
+    }
+
+    async function toggleFullscreen() {
+      if (document.fullscreenElement === prompter) {
+        await document.exitFullscreen();
+      } else if (prompter.classList.contains("is-full-window")) {
+        setFullWindow(false);
+      } else {
         try {
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          if (!AudioContextClass) return;
-          if (!audioContext) audioContext = new AudioContextClass();
-          if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
-        } catch (_) { /* 音声非対応の環境でもタイマーは使える */ }
-      }
-
-      function beep() {
-        if (!ui.sound.checked) return;
-        unlockAudio();
-        if (!audioContext) return;
-        try {
-          const startTime = audioContext.currentTime;
-          for (let i = 0; i < 5; i += 1) {
-            const pulseStart = startTime + i * 0.63;
-            const pulseEnd = pulseStart + 0.48;
-            const oscillator = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, pulseStart);
-            gain.gain.setValueAtTime(0.0001, pulseStart);
-            gain.gain.exponentialRampToValueAtTime(0.22, pulseStart + 0.02);
-            gain.gain.setValueAtTime(0.22, pulseEnd - 0.04);
-            gain.gain.exponentialRampToValueAtTime(0.0001, pulseEnd);
-            oscillator.connect(gain);
-            gain.connect(audioContext.destination);
-            oscillator.start(pulseStart);
-            oscillator.stop(pulseEnd);
-          }
-        } catch (_) { /* 音声が使えなくても画面で知らせる */ }
-      }
-
-      function flash() {
-        document.body.classList.remove('flash');
-        void document.body.offsetWidth;
-        document.body.classList.add('flash');
-        clearTimeout(flashTimeout);
-        flashTimeout = setTimeout(() => document.body.classList.remove('flash'), 1600);
-      }
-
-      function tick() {
-        if (!running) return;
-        const now = Date.now();
-        let changed = false;
-        let transitions = 0;
-        while (now >= endAt && transitions < 10000) {
-          if (phase === 'focus') {
-            completed += 1;
-            phase = 'break';
-            ui.notice.textContent = `集中が完了しました。${minutes(ui.break)}分間休憩しましょう。`;
-          } else {
-            phase = 'focus';
-            ui.notice.textContent = `休憩が終わりました。${minutes(ui.focus)}分間集中しましょう。`;
-          }
-          durationMs = phaseDuration(phase);
-          endAt += durationMs;
-          startedCurrent = true;
-          changed = true;
-          transitions += 1;
+          await prompter.requestFullscreen();
+        } catch {
+          setFullWindow(true);
         }
-        remainingMs = Math.max(0, endAt - now);
-        if (changed) { flash(); beep(); }
-        render();
       }
+    }
 
-      ui.start.addEventListener('click', () => {
-        if (running) return;
-        unlockAudio();
-        running = true;
-        startedCurrent = true;
-        endAt = Date.now() + remainingMs;
-        ui.notice.textContent = phase === 'focus' ? '集中しましょう。' : '休憩しましょう。';
-        render();
-      });
+    scriptInput.addEventListener("input", () => {
+      updateScript();
+      saveScript();
+    });
+    speed.addEventListener("input", updateSpeed);
+    fontSize.addEventListener("input", updateFontSize);
+    startButton.addEventListener("click", () => {
+      surface.focus({ preventScroll: true });
+      start();
+    });
+    pauseButton.addEventListener("click", () => {
+      surface.focus({ preventScroll: true });
+      stop("paused");
+    });
+    resetButton.addEventListener("click", (event) => {
+      if (event.detail > 0) surface.focus({ preventScroll: true });
+      reset();
+    });
+    mirrorButton.addEventListener("click", (event) => {
+      const mirrored = mirrorButton.getAttribute("aria-checked") !== "true";
+      mirrorButton.setAttribute("aria-checked", String(mirrored));
+      surface.classList.toggle("is-mirrored", mirrored);
+      if (event.detail > 0) surface.focus({ preventScroll: true });
+    });
+    fullscreenButton.addEventListener("click", async (event) => {
+      if (event.detail > 0) surface.focus({ preventScroll: true });
+      await toggleFullscreen();
+    });
+    document.addEventListener("fullscreenchange", updateFullscreenLabel);
 
-      ui.pause.addEventListener('click', () => {
-        if (!running) return;
-        remainingMs = Math.max(0, endAt - Date.now());
-        running = false;
-        ui.notice.textContent = '一時停止中です。「開始」で再開できます。';
-        render();
-      });
-
-      ui.reset.addEventListener('click', () => {
-        running = false;
-        phase = 'focus';
-        durationMs = phaseDuration(phase);
-        remainingMs = durationMs;
-        startedCurrent = false;
-        completed = 0;
-        ui.notice.textContent = 'リセットしました。「開始」を押すとタイマーが動きます。';
-        document.body.classList.remove('flash');
-        render();
-      });
-
-      for (const input of [ui.focus, ui.break]) {
-        input.addEventListener('change', () => {
-          minutes(input);
-          if (!startedCurrent && (phase === 'focus' ? input === ui.focus : input === ui.break)) {
-            durationMs = phaseDuration(phase);
-            remainingMs = durationMs;
-          }
-          render();
-        });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && prompter.classList.contains("is-full-window")) {
+        setFullWindow(false);
+        fullscreenButton.focus({ preventScroll: true });
+        return;
       }
+      if (event.code !== "Space" || event.defaultPrevented || event.isComposing ||
+          event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !hasScript) return;
+      if (event.target === scriptInput || event.target instanceof HTMLButtonElement) return;
 
-      ui.sound.addEventListener('change', () => {
-        if (ui.sound.checked) unlockAudio();
-        render();
-      });
-      ui.testSound.addEventListener('click', beep);
+      event.preventDefault();
+      if (event.repeat) return;
+      if (state === "running") stop("paused");
+      else start();
+    });
 
-      setInterval(tick, 250);
-      render();
-    })();
+    loadScript();
+    updateScript();
+    updateSpeed();
+    updateFontSize();
+    const surfaceObserver = new ResizeObserver(measure);
+    surfaceObserver.observe(surface);
   </script>
 </body>
 </html>
